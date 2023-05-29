@@ -1,9 +1,11 @@
-# Clear the screen and hold it for 3 seconds
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
 import curses
 import random
 import time
-import string
-import threading
+import subprocess
+
 
 playParams = dict()
 playParams['leftSafe'] = 25
@@ -28,10 +30,21 @@ def initCurses():
     curses.noraw()
     curses.curs_set(0)
 
+def gameLose():
+    subprocess.run(["./GPIO_bad.py"])
+    quit()
+
+def gameWin():
+    subprocess.run(["./GPIO_good.py"])
+    quit()
+
 def startPlayLevels():
     global playParams
+    timerSec = 10.0
+    startTime = 0
     naprs = [1, -1]
     servWin = curses.newwin(3, 80, 0, 0)
+    timerWin = curses.newwin(1, 9, 1, 70)
     mainWin = curses.newwin(14, 80, 3, 0)
     auxWin = curses.newwin(7, 80, 19, 0)
     servWin.clear()
@@ -40,6 +53,8 @@ def startPlayLevels():
     mainWin.nodelay(True)
     auxWin.clear()
     auxWin.nodelay(True)
+    timerWin.clear()
+    timerWin.nodelay(True)
     servWin.addstr(0, 10, "Останавливайте значение уровня сигнала с", curses.color_pair(1))
     servWin.addstr(1, 10, "помощью клавиши <ПРОБЕЛ> в безопасной зоне", curses.color_pair(1))
     servWin.addstr(2, 0, "=" * 79, curses.color_pair(1))
@@ -57,7 +72,8 @@ def startPlayLevels():
     auxWin.addstr(0, 10, "Каждая ошибка может существенно сократить", curses.color_pair(1))
     auxWin.addstr(1, 10, "Вашу жизнь!!!", curses.color_pair(1))
     auxWin.refresh()
-
+    timerWin.addstr(0, 0, "00:%05.2f" % timerSec , curses.color_pair(1))
+    timerWin.refresh()
     levelStrings=[{"x_len":0, "xNapr":0, "y":3, "timer":0, "cTime":0},
                   {"x_len":0, "xNapr":0, "y":5, "timer":0, "cTime":0},
                   {"x_len":0, "xNapr":0, "y":7, "timer":0, "cTime":0},
@@ -69,8 +85,17 @@ def startPlayLevels():
         mainWin.addstr(3+i*2, playParams['left']-1, "[==", curses.color_pair(1))
     mainWin.refresh()
     countOff = 0
+    timerC = cTime
     while True:
         cTime = millis()
+        if startTime:
+            if ((cTime - timerC) >= 100):
+                timerSec = timerSec - 0.1
+                timerWin.addstr(0, 0, "00:%05.2f" % timerSec, curses.color_pair(1))
+                timerWin.refresh()
+                timerC = cTime
+                if timerSec <= 0:
+                    gameLose()
         for i in range(countOff,4):
             if ((cTime - levelStrings[i]['cTime'])>=levelStrings[i]['timer']):
                 levelStrings[i]['x_len'] = levelStrings[i]['x_len'] + naprs[levelStrings[i]['xNapr']]
@@ -81,25 +106,16 @@ def startPlayLevels():
                                "=] ", curses.color_pair(1))
                 levelStrings[i]['cTime'] = cTime
                 mainWin.refresh()
-
         if mainWin.getch()==ord(' '):
+            startTime = 1
             if (((levelStrings[countOff]['x_len']+playParams['left']+2) >= playParams['leftSafe']) and 
                 ((levelStrings[countOff]['x_len']+playParams['left']+2) <= playParams['rightSafe'])):
                 countOff = countOff + 1
                 if(countOff>=4):
-                    print("Win")
-                    quit()
+                    gameWin()
             else:
-                print("Lose")
-                quit()
+                gameWin()
  
-
-        
-        
-
- 
-
-
 def startTerminal():
     global db_parameters
     global db_updated
